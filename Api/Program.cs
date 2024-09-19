@@ -4,11 +4,13 @@ using Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
+using System.Linq;
 using System.Text;
 
 
@@ -21,6 +23,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<JWTService>();
+builder.Services.AddScoped<EmailService>();
 
 //be able to inject JWTService Class inside our Controllers
 builder.Services.AddDbContext<Context>(options =>
@@ -47,10 +50,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-
-
-
-
+//builder.Services.AddCors(); -- doesnt work
 
 //defining our IdentityCore Service
 builder.Services.AddIdentityCore<User>(options =>
@@ -71,7 +71,62 @@ builder.Services.AddIdentityCore<User>(options =>
     .AddUserManager<UserManager<User>>()//Make user  of UserManager  to create users
     .AddDefaultTokenProviders();//ba able to create tokens for email confirmation
 
+
+
+
+// Add CORS services
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowMyOrigin",
+        policy =>
+        {
+            policy.WithOrigins("http://localhost:4200") // Your frontend origin
+                  .AllowAnyMethod() // Allow any HTTP method (GET, POST, etc.)
+                  .AllowAnyHeader() // Allow any header
+                  .AllowCredentials(); // Allow credentials (cookies, HTTP auth, etc.)
+        });
+});
+
+
+
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+
+    options.InvalidModelStateResponseFactory = actionsContext =>
+    {
+        var errors = actionsContext.ModelState
+        .Where(x => x.Value.Errors.Count > 0)
+        .SelectMany(x => x.Value.Errors)
+        .Select(x => x.ErrorMessage).ToArray();
+
+        var toReturn = new
+        {
+            Errors = errors
+        };
+        return new BadRequestObjectResult(toReturn);
+    }
+    
+
+
+);
+
+
+
+
+
+
+
+
+
+
 var app = builder.Build();
+
+
+// Use CORS policy
+app.UseCors("AllowMyOrigin");
+//app.UseCors(opt => {
+
+//    opt.AllowAnyHeader().AllowAnyMethod().AllowCredentials().WithOrigins(builder.Configuration["JWT:clientUrl"]);
+//}); -- doesnt work
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
